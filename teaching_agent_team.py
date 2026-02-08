@@ -12,6 +12,8 @@ from PIL import Image
 import hashlib
 import time
 import re
+import os
+
 
 # ================== HELPERS ==================
 
@@ -111,7 +113,9 @@ if "generation_id" not in st.session_state:
     st.session_state["generation_id"] = ""
 
 # ⚠️ TEMP (REMOVE BEFORE DEPLOYMENT)
-st.session_state["gemini_api_key"] = "AIzaSyAvIBIAoNmcOEAXniSve2vwr36bgszi0XA"
+
+st.session_state["gemini_api_key"] = st.secrets["GEMINI_API_KEY"]
+
 
 if not st.session_state["gemini_api_key"]:
     st.error("Gemini API key missing.")
