@@ -97,12 +97,22 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# ================== LOAD CUSTOM CSS ==================
+
+try:
+    with open("new.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+except FileNotFoundError:
+    pass  # CSS file optional
+
 # ================== SESSION STATE ==================
 
 if "gemini_api_key" not in st.session_state:
     st.session_state["gemini_api_key"] = ""
 if "question_patterns" not in st.session_state:
     st.session_state["question_patterns"] = [{"count": 4, "marks": 2}]
+if "bloom_taxonomy" not in st.session_state:
+    st.session_state["bloom_taxonomy"] = []
 if "pdfs" not in st.session_state:
     st.session_state["pdfs"] = {}
 if "sections" not in st.session_state:
@@ -111,7 +121,7 @@ if "generation_id" not in st.session_state:
     st.session_state["generation_id"] = ""
 
 # ⚠️ TEMP (REMOVE BEFORE DEPLOYMENT)
-st.session_state["gemini_api_key"] = "AIzaSyAvIBIAoNmcOEAXniSve2vwr36bgszi0XA"
+st.session_state["gemini_api_key"] = st.secrets["GEMINI_API_KEY"]
 
 if not st.session_state["gemini_api_key"]:
     st.error("Gemini API key missing.")
@@ -206,10 +216,88 @@ for i, qp in enumerate(st.session_state["question_patterns"]):
                 st.session_state["question_patterns"].pop(i)
                 st.rerun()
 
+# Calculate total questions
+total_questions = sum(qp["count"] for qp in st.session_state["question_patterns"])
+st.info(f"📊 **Total Questions: {total_questions}**")
+
+# ================== BLOOM'S TAXONOMY BUILDER ==================
+
+st.markdown("## 🎯 Bloom's Taxonomy Distribution (Optional)")
+st.markdown("Distribute questions across cognitive levels according to Bloom's Taxonomy")
+
+BLOOM_LEVELS = [
+    "Remembering",
+    "Understanding",
+    "Applying",
+    "Analyzing",
+    "Evaluating",
+    "Creating"
+]
+
+for i, taxonomy in enumerate(st.session_state["bloom_taxonomy"]):
+    c1, c2, c3, c4 = st.columns([3, 3, 0.6, 0.6])
+    
+    with c1:
+        taxonomy["level"] = st.selectbox(
+            "Taxonomy Level",
+            BLOOM_LEVELS,
+            index=BLOOM_LEVELS.index(taxonomy["level"]) if taxonomy["level"] in BLOOM_LEVELS else 0,
+            key=f"tax_level_{i}"
+        )
+    
+    with c2:
+        taxonomy["count"] = st.number_input(
+            "Number of Questions",
+            min_value=1,
+            max_value=total_questions,
+            value=min(taxonomy["count"], total_questions),
+            key=f"tax_count_{i}"
+        )
+    
+    with c3:
+        st.markdown("<div style='padding-top: 1.85rem;'></div>", unsafe_allow_html=True)
+        if st.button("➕", key=f"add_tax_{i}", use_container_width=True):
+            st.session_state["bloom_taxonomy"].append({"level": "Understanding", "count": 1})
+            st.rerun()
+    
+    with c4:
+        st.markdown("<div style='padding-top: 1.85rem;'></div>", unsafe_allow_html=True)
+        if st.button("➖", key=f"remove_tax_{i}", use_container_width=True):
+            st.session_state["bloom_taxonomy"].pop(i)
+            st.rerun()
+
+if len(st.session_state["bloom_taxonomy"]) == 0:
+    if st.button("➕ Add Bloom's Taxonomy Distribution", use_container_width=True):
+        st.session_state["bloom_taxonomy"].append({"level": "Understanding", "count": 1})
+        st.rerun()
+
+# Validate taxonomy distribution
+if st.session_state["bloom_taxonomy"]:
+    taxonomy_total = sum(t["count"] for t in st.session_state["bloom_taxonomy"])
+    
+    if taxonomy_total > total_questions:
+        st.error(f"❌ Taxonomy distribution ({taxonomy_total}) exceeds total questions ({total_questions})!")
+    elif taxonomy_total < total_questions:
+        st.warning(f"⚠️ Taxonomy distribution ({taxonomy_total}) is less than total questions ({total_questions}). Remaining {total_questions - taxonomy_total} questions will be mixed.")
+    else:
+        st.success(f"✅ Taxonomy distribution matches total questions ({taxonomy_total}/{total_questions})")
+    
+    st.markdown("**Distribution Summary:**")
+    for t in st.session_state["bloom_taxonomy"]:
+        st.markdown(f"- {t['level']}: {t['count']} questions")
+
 def question_instruction():
     return "\n".join(
         f"- {q['count']} questions of {q['marks']} marks each"
         for q in st.session_state["question_patterns"]
+    )
+
+def taxonomy_instruction():
+    if not st.session_state["bloom_taxonomy"]:
+        return "No specific Bloom's Taxonomy distribution specified. Mix all levels."
+    return "\n".join(
+        f"- {t['count']} questions at {t['level']} level"
+        for t in st.session_state["bloom_taxonomy"]
     )
 
 # ================== PROMPT TEMPLATES ==================
@@ -264,12 +352,19 @@ SECTION 1: QUESTIONS ONLY (FOR STUDENTS)
 - Follow the given mark distribution
 - Do NOT look at answers while solving
 
-**QUESTIONS:**
+**MARK DISTRIBUTION:**
 {question_instruction()}
 
-[Generate exactly as many questions as specified above. Format each as:]
-Question 1 ({st.session_state['question_patterns'][0]['marks']} Marks): [Question text]
-Question 2 ({st.session_state['question_patterns'][0]['marks']} Marks): [Question text]
+**BLOOM'S TAXONOMY DISTRIBUTION:**
+{taxonomy_instruction()}
+
+**QUESTIONS:**
+[Generate exactly as many questions as specified above following the Bloom's Taxonomy distribution. Format each question as:]
+
+Question 1 (X Marks) [Bloom's Level: Understanding]: [Question text]
+
+Question 2 (X Marks) [Bloom's Level: Applying]: [Question text]
+
 ... and so on
 
 ═══════════════════════════════════════
@@ -278,8 +373,12 @@ SECTION 2: ANSWER KEY (FOR TEACHERS)
 
 **ANSWER KEY:**
 
-Answer 1: [Detailed explanation with steps]
-Answer 2: [Detailed explanation with steps]
+Answer 1 [Bloom's Level: Understanding]:
+[Detailed explanation with steps, formulas, and working]
+
+Answer 2 [Bloom's Level: Applying]:
+[Detailed explanation with steps, formulas, and working]
+
 ... and so on
 
 Make each answer comprehensive, include formulas, working, and diagrams descriptions where needed.
@@ -301,10 +400,13 @@ INSTRUCTIONS:
 QUESTION STRUCTURE:
 {question_instruction()}
 
+BLOOM'S TAXONOMY DISTRIBUTION:
+{taxonomy_instruction()}
+
 RULES:
 - Strictly syllabus-based
 - Exam-oriented language
-- Mixed Bloom’s taxonomy (do not mention)
+- Follow the specified Bloom's taxonomy distribution
 - Provide answers clearly
 
 OUTPUT SECTIONS:
@@ -314,22 +416,40 @@ OUTPUT SECTIONS:
 4. QUESTION BANK WITH ANSWERS
 
 QUESTION BANK FORMAT (IMPORTANT - FOLLOW EXACTLY):
+
+═══════════════════════════════════════
 SECTION 1: QUESTIONS ONLY (FOR STUDENTS)
+═══════════════════════════════════════
+
 INSTRUCTIONS:
 - Attempt all questions
 - Write legible answers
 - Show all steps/working
 - Follow the given mark distribution
-- Mark distribution:
+
+MARK DISTRIBUTION:
 {question_instruction()}
 
-QUESTIONS:
-Question 1 (X Marks): ...
-Question 2 (X Marks): ...
+BLOOM'S TAXONOMY DISTRIBUTION:
+{taxonomy_instruction()}
 
+QUESTIONS:
+
+Question 1 (X Marks) [Bloom's Level: Understanding]: ...
+
+Question 2 (X Marks) [Bloom's Level: Applying]: ...
+
+═══════════════════════════════════════
 SECTION 2: ANSWER KEY (FOR TEACHERS)
-Answer 1: ...
-Answer 2: ...
+═══════════════════════════════════════
+
+ANSWER KEY:
+
+Answer 1 [Bloom's Level: Understanding]:
+[Detailed explanation]
+
+Answer 2 [Bloom's Level: Applying]:
+[Detailed explanation]
 """
 
 # ================== GENERATE ==================
@@ -432,7 +552,11 @@ if st.button("🚀 Generate Learning Pack", type="primary", use_container_width=
             answers_only = "No answer key found"
 
     # Add instructions to question paper (include mark distribution)
-    question_instructions = """INSTRUCTIONS:
+    question_instructions = """═══════════════════════════════════════
+QUESTION PAPER
+═══════════════════════════════════════
+
+INSTRUCTIONS:
 - Attempt all questions
 - Write legible answers
 - Show all steps/working
@@ -441,11 +565,15 @@ if st.button("🚀 Generate Learning Pack", type="primary", use_container_width=
 
     mark_distribution = question_instruction()
     if mark_distribution:
-        question_instructions = f"{question_instructions}Mark distribution:\n{mark_distribution}\n"
+        question_instructions = f"{question_instructions}\nMARK DISTRIBUTION:\n{mark_distribution}\n"
+    
+    taxonomy_dist = taxonomy_instruction()
+    if taxonomy_dist and st.session_state["bloom_taxonomy"]:
+        question_instructions = f"{question_instructions}\nBLOOM'S TAXONOMY DISTRIBUTION:\n{taxonomy_dist}\n"
 
     questions_only = f"{question_instructions}\n{questions_only}".strip()
 
-    qa_combined = f"{questions_only}\n\nANSWER KEY:\n{answers_only}".strip()
+    qa_combined = f"{questions_only}\n\n{'═'*40}\nANSWER KEY\n{'═'*40}\n\n{answers_only}".strip()
 
     # ================== CREATE PDFs (5 documents) ==================
 
@@ -461,7 +589,7 @@ if st.button("🚀 Generate Learning Pack", type="primary", use_container_width=
         "01_Notes": sections["notes"],
         "02_Roadmap": sections["roadmap"],
         "03_Resources": sections["resources"],
-        "04_QBank": qa_combined,
+        "04_QA": qa_combined,
     }
     
     st.session_state["pdfs"] = pdfs
@@ -486,7 +614,11 @@ if st.session_state["pdfs"]:
                 if name in st.session_state["sections"]:
                     content_to_show = st.session_state["sections"][name]
                     if content_to_show and content_to_show.strip():
-                        st.markdown(content_to_show)
+                        # Use a container with custom styling
+                        with st.container():
+                            # Format content better for display
+                            formatted_content = content_to_show.replace("═", "─")
+                            st.markdown(formatted_content, unsafe_allow_html=True)
                     else:
                         st.warning(f"No content for {name}")
                 else:

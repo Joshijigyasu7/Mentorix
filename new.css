@@ -1,6 +1,12 @@
-*{
-    
- margin-left: 10px;   
- color: whi;
+/* Minimal styling for Mentorix - keeping it simple */
 
+/* Question and Answer formatting in preview */
+.stMarkdown h1,
+.stMarkdown h2,
+.stMarkdown h3 {
+    color: #003366;
+}
+
+.stMarkdown hr {
+    border-top: 2px solid #003366;
 }
