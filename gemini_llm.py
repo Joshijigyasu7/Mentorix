@@ -33,11 +33,30 @@ class GeminiLLM:
                 if response.status_code == 200:
                     data = response.json()
                     return data["candidates"][0]["content"]["parts"][0]["text"]
-
-                else:
+                
+                elif response.status_code == 429:
+                    # Rate limit or quota exceeded
+                    if attempt < retries - 1:
+                        time.sleep(5 * (attempt + 1))  # longer backoff for quota issues
+                        continue
+                    else:
+                        return "⚠️ API quota exhausted or rate limit reached. Please try again later."
+                
+                elif response.status_code in [400, 403]:
+                    # Bad request or authentication error - don't retry
                     raise RuntimeError(
-                        f"Gemini API error {response.status_code}: {response.text}"
+                        f"Gemini API error {response.status_code}: Invalid request or API key issue"
                     )
+                
+                else:
+                    # Other errors - retry with backoff
+                    if attempt < retries - 1:
+                        time.sleep(2 * (attempt + 1))
+                        continue
+                    else:
+                        raise RuntimeError(
+                            f"Gemini API error {response.status_code}: {response.text}"
+                        )
 
             except requests.exceptions.ReadTimeout:
                 if attempt < retries - 1:

@@ -613,7 +613,15 @@ if input_ready:
         total_questions = generated_questions_count + custom_questions_count
 
         with st.spinner("Generating content..."):
-            content = gemini.run(master_prompt())
+            try:
+                content = gemini.run(master_prompt())
+            except RuntimeError as e:
+                st.error(f"❌ Gemini API Error: {str(e)}")
+                st.info("💡 **Possible solutions:**\n- Check your API key is valid\n- Verify you have quota remaining\n- Try reducing the complexity of your request\n- Wait a few moments and try again")
+                st.stop()
+            except Exception as e:
+                st.error(f"❌ Unexpected error: {str(e)}")
+                st.stop()
 
         if is_quota_exhausted(content):
             st.warning("⚠️ Gemini free quota exhausted. Please retry after some time.")
