@@ -20,14 +20,14 @@ class GeminiLLM:
                 }
             ]
         }
-
+        
         for attempt in range(retries):
             try:
                 response = requests.post(
                     f"{self.url}?key={self.api_key}",
                     headers={"Content-Type": "application/json"},
                     data=json.dumps(payload),
-                    timeout=180  # ⬅️ increased timeout
+                    timeout=60
                 )
 
                 if response.status_code == 200:
@@ -37,10 +37,10 @@ class GeminiLLM:
                 elif response.status_code == 429:
                     # Rate limit or quota exceeded
                     if attempt < retries - 1:
-                        time.sleep(5 * (attempt + 1))  # longer backoff for quota issues
+                        time.sleep(5 * (attempt + 1))
                         continue
                     else:
-                        return "⚠️ API quota exhausted or rate limit reached. Please try again later."
+                        raise RuntimeError("API quota exhausted or rate limit reached. Please try again later.")
                 
                 elif response.status_code in [400, 403]:
                     # Bad request or authentication error - don't retry
@@ -60,9 +60,27 @@ class GeminiLLM:
 
             except requests.exceptions.ReadTimeout:
                 if attempt < retries - 1:
-                    time.sleep(2 * (attempt + 1))  # backoff
+                    continue
                 else:
-                    return (
-                        "⚠️ Gemini timed out while generating this section.\n\n"
-                        "Please try again or shorten the prompt."
-                    )
+                    raise RuntimeError("Gemini timed out. Please try again or simplify your request.")
+            
+            except requests.exceptions.ConnectionError:
+                if attempt < retries - 1:
+                    time.sleep(2)
+                    continue
+                else:
+                    raise RuntimeError("Connection error. Please check your internet connection.")
+            
+            except requests.exceptions.RequestException as e:
+                if attempt < retries - 1:
+                    time.sleep(2)
+                    continue
+                else:
+                    raise RuntimeError(f"Network error: {str(e)}")
+            
+            except (KeyError, IndexError, json.JSONDecodeError) as e:
+                # Response parsing error
+                raise RuntimeError(f"Failed to parse API response: {str(e)}")
+        
+        # Fallback if we somehow exit the loop without returning
+        raise RuntimeError("Failed to generate content after multiple attempts. Please try again.")

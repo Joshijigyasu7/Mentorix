@@ -123,7 +123,7 @@ if "generation_id" not in st.session_state:
     st.session_state["generation_id"] = ""
 
 # ⚠️ TEMP (REMOVE BEFORE DEPLOYMENT)
-st.session_state["gemini_api_key"] = st.secrets["GEMINI_API_KEY"]
+st.session_state["gemini_api_key"] = "AIzaSyDeKlKSAK_4btlqRjX3FKFRxzyX8ISsbKY"
 if not st.session_state["gemini_api_key"]:
     st.error("Gemini API key missing.")
     st.stop()
@@ -391,14 +391,14 @@ if input_ready:
         for t in st.session_state["bloom_taxonomy"]:
             st.markdown(f"- {t['level']}: {t['count']} questions")
 
-def question_instruction():
+def question_instruction(custom_qs):
     marks_map = {}
 
     for q in st.session_state["question_patterns"]:
         marks = int(q["marks"])
         marks_map[marks] = marks_map.get(marks, 0) + int(q["count"])
 
-    for q in active_custom_questions:
+    for q in custom_qs:
         marks = int(q["marks"])
         marks_map[marks] = marks_map.get(marks, 0) + 1
 
@@ -415,12 +415,12 @@ def taxonomy_instruction():
         for t in st.session_state["bloom_taxonomy"]
     )
 
-def custom_questions_instruction():
-    if not active_custom_questions:
+def custom_questions_instruction(custom_qs):
+    if not custom_qs:
         return "No custom teacher-framed questions provided."
     return "\n".join(
         f"- ({q['marks']} Marks) [Bloom's Level: {q['bloom_level']}] {q['text']}"
-        for i, q in enumerate(active_custom_questions)
+        for i, q in enumerate(custom_qs)
     )
 
 # ================== PROMPT TEMPLATES ==================
@@ -514,36 +514,36 @@ Answer 2 [Bloom's Level: Applying]:
 Make each answer comprehensive, include formulas, working, and diagrams descriptions where needed.
 """
 
-def master_prompt():
+def master_prompt(topic_text, syllabus, instructions, gen_q_count, custom_q_count, total_q, custom_qs):
     return f"""
 You are an academic expert.
 
 TOPIC:
-{topic or "Derive from syllabus"}
+{topic_text or "Derive from syllabus"}
 
 SYLLABUS:
-{syllabus_text or "Not provided"}
+{syllabus or "Not provided"}
 
 INSTRUCTIONS:
-{extra_prompt or "None"}
+{instructions or "None"}
 
 QUESTION STRUCTURE:
-{question_instruction()}
+{question_instruction(custom_qs)}
 
 BLOOM'S TAXONOMY DISTRIBUTION:
 {taxonomy_instruction()}
 
 CUSTOM TEACHER-FRAMED QUESTIONS (MANDATORY TO INCLUDE):
-{custom_questions_instruction()}
+{custom_questions_instruction(custom_qs)}
 
 RULES:
 - Strictly syllabus-based
 - Exam-oriented language
-- Bloom's taxonomy distribution applies ONLY to pattern-menu questions ({generated_questions_count} questions)
+- Bloom's taxonomy distribution applies ONLY to pattern-menu questions ({gen_q_count} questions)
 - Custom questions MUST use their specified Bloom's levels (already defined)
-- Total questions must be exactly {total_questions}
-- Pattern-menu questions count must be exactly {generated_questions_count}
-- Custom questions count must be exactly {custom_questions_count}
+- Total questions must be exactly {total_q}
+- Pattern-menu questions count must be exactly {gen_q_count}
+- Custom questions count must be exactly {custom_q_count}
 - If custom teacher-framed questions are provided, include them verbatim with the same marks and same Bloom's level, and generate answers for them
 - Do not label questions as custom; present all questions in one unified list
 - Ensure mark distribution and answer key match the final question list exactly
@@ -569,7 +569,7 @@ INSTRUCTIONS:
 - Follow the given mark distribution
 
 MARK DISTRIBUTION:
-{question_instruction()}
+{question_instruction(custom_qs)}
 
 BLOOM'S TAXONOMY DISTRIBUTION:
 {taxonomy_instruction()}
@@ -612,20 +612,45 @@ if input_ready:
         custom_questions_count = len(active_custom_questions)
         total_questions = generated_questions_count + custom_questions_count
 
-        with st.spinner("Generating content..."):
+        # Generate prompt
+        prompt = master_prompt(
+            topic_text=topic,
+            syllabus=syllabus_text,
+            instructions=extra_prompt,
+            gen_q_count=generated_questions_count,
+            custom_q_count=custom_questions_count,
+            total_q=total_questions,
+            custom_qs=active_custom_questions
+        )
+
+        with st.spinner("🔄 Generating content... (this may take 30-60 seconds)"):
             try:
-                content = gemini.run(master_prompt())
+                content = gemini.run(prompt)
+                st.success("✅ Content generated successfully!")
             except RuntimeError as e:
                 st.error(f"❌ Gemini API Error: {str(e)}")
                 st.info("💡 **Possible solutions:**\n- Check your API key is valid\n- Verify you have quota remaining\n- Try reducing the complexity of your request\n- Wait a few moments and try again")
                 st.stop()
             except Exception as e:
                 st.error(f"❌ Unexpected error: {str(e)}")
+                st.info(f"Error type: {type(e).__name__}")
+                import traceback
+                st.code(traceback.format_exc())
                 st.stop()
 
+        # Validate content
         if is_quota_exhausted(content):
             st.warning("⚠️ Gemini free quota exhausted. Please retry after some time.")
             st.stop()
+        
+        if not content or len(content.strip()) < 100:
+            st.error("❌ Received empty or too short response from Gemini API")
+            st.info(f"Response length: {len(content)} characters")
+            with st.expander("View Response"):
+                st.text(content)
+            st.stop()
+        
+        st.info(f"📊 Processing content... ({len(content)} characters received)")
 
         # ================== SPLIT SECTIONS ==================
 
@@ -742,7 +767,7 @@ INSTRUCTIONS:
 - Follow the given mark distribution
 """
 
-            mark_distribution = question_instruction()
+            mark_distribution = question_instruction(active_custom_questions)
             if mark_distribution:
                 question_instructions = f"{question_instructions}\nMARK DISTRIBUTION:\n{mark_distribution}\n"
             
@@ -781,11 +806,11 @@ INSTRUCTIONS:
                 "03_Resources": sections["resources"],
             }
         
-            st.session_state["pdfs"] = pdfs
-            st.session_state["sections"] = display_content
-            st.session_state["generation_id"] = hashlib.md5(str(time.time()).encode()).hexdigest()[:8]
+        st.session_state["pdfs"] = pdfs
+        st.session_state["sections"] = display_content
+        st.session_state["generation_id"] = hashlib.md5(str(time.time()).encode()).hexdigest()[:8]
 
-            st.success("✅ Learning pack generated successfully!")
+        st.success("✅ Learning pack generated successfully!")
 
 # ================== DISPLAY DOWNLOADS (outside button block - persists) ==================
 

@@ -1,12 +1,126 @@
-/* Minimal styling for Mentorix - keeping it simple */
+/* Mentorix dark UI refresh: better contrast + cleaner organization */
 
-/* Question and Answer formatting in preview */
-.stMarkdown h1,
-.stMarkdown h2,
-.stMarkdown h3 {
-    color: #003366;
+:root {
+    --mx-bg: #0b1220;
+    --mx-surface: #121a2b;
+    --mx-surface-soft: #18243a;
+    --mx-text: #e8edf7;
+    --mx-muted: #b4c0d4;
+    --mx-primary: #5b8cff;
+    --mx-primary-hover: #4a79e9;
+    --mx-border: #2a3a57;
+    --mx-success-bg: #123223;
+    --mx-warning-bg: #3b2b10;
+    --mx-info-bg: #132844;
 }
 
-.stMarkdown hr {
-    border-top: 2px solid #003366;
+.stApp {
+    background: linear-gradient(180deg, #09101c 0%, var(--mx-bg) 100%);
+    color: var(--mx-text);
+}
+
+html, body, [class*="css"] {
+    font-family: "Inter", "Segoe UI", sans-serif;
+    color: var(--mx-text);
+}
+
+section.main > div {
+    background: transparent;
+}
+
+div.block-container {
+    max-width: 1180px;
+    padding-top: 1.2rem;
+    padding-bottom: 2.4rem;
+}
+
+.stMarkdown h1,
+.stMarkdown h2,
+.stMarkdown h3,
+.stMarkdown p,
+.stText,
+.stCaption,
+label,
+span {
+    color: var(--mx-text);
+}
+
+.stMarkdown hr,
+[data-testid="stDivider"] {
+    border-color: var(--mx-border);
+}
+
+[data-testid="stVerticalBlock"] > [style*="flex-direction: column"] > [data-testid="stVerticalBlock"] {
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+    border-radius: 14px;
+    padding: 0.9rem 1rem;
+}
+
+.stTextInput input,
+.stTextArea textarea,
+.stNumberInput input,
+.stSelectbox [data-baseweb="select"] > div,
+.stMultiSelect [data-baseweb="select"] > div {
+    border-radius: 10px !important;
+    border: 1px solid var(--mx-border) !important;
+    background: #0f1829 !important;
+    color: var(--mx-text) !important;
+}
+
+.stTextInput input::placeholder,
+.stTextArea textarea::placeholder {
+    color: #91a3c1 !important;
+    opacity: 1 !important;
+}
+
+.stTextInput input:focus,
+.stTextArea textarea:focus,
+.stNumberInput input:focus {
+    border-color: var(--mx-primary) !important;
+    box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.22) !important;
+}
+
+[data-testid="stRadio"] > div {
+    background: var(--mx-surface-soft);
+    border: 1px solid var(--mx-border);
+    border-radius: 12px;
+    padding: 0.45rem 0.6rem;
+}
+
+.stButton > button,
+[data-testid="stDownloadButton"] > button {
+    border-radius: 10px;
+    border: 1px solid var(--mx-primary);
+    background: var(--mx-primary);
+    color: #ffffff;
+    font-weight: 600;
+    transition: background 0.2s ease, transform 0.08s ease;
+}
+
+.stButton > button:hover,
+[data-testid="stDownloadButton"] > button:hover {
+    background: var(--mx-primary-hover);
+    border-color: var(--mx-primary-hover);
+}
+
+.stButton > button:active,
+[data-testid="stDownloadButton"] > button:active {
+    transform: translateY(1px);
+}
+
+[data-testid="stAlert"] {
+    border-radius: 12px;
+    border: 1px solid var(--mx-border);
+    color: var(--mx-text);
+}
+
+[data-testid="stAlert"][kind="info"] { background: var(--mx-info-bg); }
+[data-testid="stAlert"][kind="warning"] { background: var(--mx-warning-bg); }
+[data-testid="stAlert"][kind="success"] { background: var(--mx-success-bg); }
+
+[data-testid="stExpander"] {
+    border-radius: 12px;
+    border: 1px solid var(--mx-border);
+    background: var(--mx-surface);
 }
