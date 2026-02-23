@@ -123,7 +123,7 @@ if "generation_id" not in st.session_state:
     st.session_state["generation_id"] = ""
 
 # ⚠️ TEMP (REMOVE BEFORE DEPLOYMENT)
-st.session_state["gemini_api_key"] = "AIzaSyDeKlKSAK_4btlqRjX3FKFRxzyX8ISsbKY"
+st.session_state["gemini_api_key"] =st.secrets["GEMINI_API_KEY"]
 if not st.session_state["gemini_api_key"]:
     st.error("Gemini API key missing.")
     st.stop()
