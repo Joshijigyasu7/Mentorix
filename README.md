@@ -14,7 +14,7 @@
 
 ## 📖 Overview
 
-**Mentorix** is an intelligent academic companion that transforms how students prepare for exams. Powered by Google's Gemini 2.5 Flash LLM, it generates comprehensive learning materials from either a simple topic name or an uploaded syllabus document.
+**Mentorix** is an intelligent academic companion that transforms how students prepare for exams and how faculties provide Exam ready comprehensive materials to the students. Powered by Google's Gemini 2.5 Flash LLM, it generates comprehensive learning materials from either a simple topic name or an uploaded syllabus document.
 
 ### ✨ Key Features
 
